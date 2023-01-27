@@ -1,0 +1,26 @@
+name: MidiPlayer
+main: top.dsbbs2.mp.MidiPlayer
+version: 0.1
+author: lvyitian
+description: Provide two commands to play or stop playing midi
+permissions:
+  midiplayer.command.play:
+    default: true
+    description: Allows the user to execute the playmidi command.
+  midiplayer.command.stop:
+    default: true
+    description: Allows the user to execute the stopmidi command.
+  midiplayer.command.*:
+    default: true
+    description: All Permissions
+    children:
+      midiplayer.command.play: true
+      midiplayer.command.stop: true
+commands:
+  playmidi:
+    usage: /playmidi <midi_file>
+    description: "Play Midi"
+    permission: midiplayer.command.play
+  stopmidi:
+    description: Stop playing midi
+    permission: midiplayer.command.stop

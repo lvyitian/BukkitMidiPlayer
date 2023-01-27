@@ -1,72 +1,74 @@
 package top.dsbbs2.mp.command;
 
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.PrintStream;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Locale;
-import java.util.Optional;
 import java.util.stream.Collectors;
 
-import org.spongepowered.api.command.CommandCallable;
-import org.spongepowered.api.command.CommandException;
-import org.spongepowered.api.command.CommandResult;
-import org.spongepowered.api.command.CommandSource;
-import org.spongepowered.api.entity.living.player.Player;
-import org.spongepowered.api.text.Text;
-import org.spongepowered.api.world.Location;
-import org.spongepowered.api.world.World;
+import org.bukkit.command.Command;
+import org.bukkit.command.CommandExecutor;
+import org.bukkit.command.CommandSender;
+import org.bukkit.command.TabCompleter;
+import org.bukkit.entity.Player;
 
 import com.google.common.collect.Lists;
 
 import top.dsbbs2.mp.MidiPlayer;
 import top.dsbbs2.mp.util.MidiUtil;
 
-public class PlayMidiCommand implements CommandCallable {
-
+public class PlayMidiCommand implements CommandExecutor,TabCompleter {
 	@Override
-	public Optional<Text> getHelp(CommandSource var1) {
-		return Optional.of(Text.of("/playmidi <midi_file>"));
+	public List<String> onTabComplete(CommandSender paramCommandSender, Command paramCommand, String paramString,
+			String[] paramArrayOfString) {
+		Lists.newArrayList(MidiPlayer.getInstance().getDataFolder().listFiles(f->f.isFile()&&f.getName().endsWith(".mid")&&f.getName().contains(" "))).parallelStream().forEach(i->i.renameTo(new File(i.getParent(),i.getName().replace(" ", ""))));
+		StringBuilder arg=new StringBuilder();
+		for(String i : paramArrayOfString)
+			arg.append(i+" ");
+		String args=arg.toString().trim();
+		return Lists.newArrayList(MidiPlayer.getInstance().getDataFolder().listFiles(f->f.isFile()&&f.getName().endsWith(".mid")&&!f.getName().contains(" "))).parallelStream().map(File::getName).filter(i->i.toLowerCase(Locale.getDefault()).startsWith(args.toLowerCase(Locale.getDefault()))).collect(Collectors.toList());
 	}
 
 	@Override
-	public Optional<Text> getShortDescription(CommandSource var1) {
-		return Optional.of(Text.of("Play Midi"));
-	}
-
-	@Override
-	public List<String> getSuggestions(CommandSource var1, String var2, Location<World> var3) throws CommandException {
-		Lists.newArrayList(MidiPlayer.getInstance().getConfigDir().toFile().listFiles(f->f.isFile()&&f.getName().endsWith(".mid")&&f.getName().contains(" "))).parallelStream().forEach(i->i.renameTo(new File(i.getParent(),i.getName().replace(" ", ""))));
-		return Lists.newArrayList(MidiPlayer.getInstance().getConfigDir().toFile().listFiles(f->f.isFile()&&f.getName().endsWith(".mid")&&!f.getName().contains(" "))).parallelStream().map(File::getName).filter(i->i.toLowerCase(Locale.getDefault()).startsWith(var2.toLowerCase(Locale.getDefault()))).collect(Collectors.toList());
-	}
-
-	@Override
-	public Text getUsage(CommandSource var1) {
-		return Text.of("/playmidi <midi_file>");
-	}
-
-	@Override
-	public CommandResult process(CommandSource var1, String var2) throws CommandException {
-		if (var2.isEmpty()) {
-			throw new CommandException(Text.of("Argument midi_file is required"));
-		}
-		if(!new File(MidiPlayer.getInstance().getConfigDir().toFile(),var2).isFile())
-			throw new CommandException(Text.of("midi_file does not exist"));
-		if(var1 instanceof Player)
+	public boolean onCommand(CommandSender paramCommandSender, Command paramCommand, String paramString,
+			String[] paramArrayOfString) {
+		StringBuilder arg=new StringBuilder();
+		for(String i : paramArrayOfString)
+			arg.append(i+" ");
+		String args=arg.toString().trim();
+		if(args.isEmpty())
 		{
-			Player p=(Player)var1;
+			paramCommandSender.sendMessage("Argument midi_file is required");
+			return false;
+		}
+		if(!new File(MidiPlayer.getInstance().getDataFolder(),args).isFile())
+		{
+			paramCommandSender.sendMessage("midi_file does not exist");
+			return true;
+		}
+		if(paramCommandSender instanceof Player)
+		{
+			Player p=(Player)paramCommandSender;
 			try {
 				MidiUtil.stop(p.getUniqueId());
-				MidiUtil.playMidi(new FileInputStream(new File(MidiPlayer.getInstance().getConfigDir().toFile(),var2)),1.0f,p.getUniqueId(),MidiUtil.PlaySoundAble.newPlaySoundAble(p));
+				MidiUtil.playMidi(new FileInputStream(new File(MidiPlayer.getInstance().getDataFolder(),args)),1.0f,p.getUniqueId(),MidiUtil.PlaySoundAble.newPlaySoundAble(p));
 			} catch (Throwable e) {
-				throw new CommandException(Text.of("Error occurred"), e);
+				paramCommandSender.sendMessage("Error occurred\n"+throwableToString(e));
 			}
-		}else {
-			throw new CommandException(Text.of("This command can only be executed by a player"));
 		}
-		return CommandResult.success();
+		return true;
 	}
-	@Override
-	public boolean testPermission(CommandSource var1) {
-		return var1.hasPermission("midiplayer.command.play");
+	public String throwableToString(Throwable e) {
+		try(ByteArrayOutputStream bao=new ByteArrayOutputStream())
+		{
+			try(PrintStream ps=new PrintStream(bao,true,StandardCharsets.UTF_8))
+			{
+				e.printStackTrace(ps);
+			}
+			return new String(bao.toByteArray(),StandardCharsets.UTF_8);
+		}catch(Throwable t) {if(t instanceof Error)throw (Error)t;else if(t instanceof RuntimeException)throw (RuntimeException)t;else throw new RuntimeException(t);}
 	}
 }

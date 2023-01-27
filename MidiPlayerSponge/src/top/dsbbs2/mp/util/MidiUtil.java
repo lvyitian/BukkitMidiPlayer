@@ -2,17 +2,11 @@ package top.dsbbs2.mp.util;
 
 import javax.sound.midi.*;
 
-import org.spongepowered.api.effect.sound.SoundCategories;
-import org.spongepowered.api.effect.sound.SoundType;
-import org.spongepowered.api.effect.sound.SoundTypes;
-import org.spongepowered.api.entity.living.player.User;
-//import org.spongepowered.api.scheduler.Task;
-import org.spongepowered.api.world.Location;
-import org.spongepowered.api.world.World;
-
-//import top.dsbbs2.mp.MidiPlayer;
-
-//import top.dsbbs2.mp.MidiPlayer;
+import org.bukkit.Location;
+import org.bukkit.OfflinePlayer;
+import org.bukkit.Sound;
+import org.bukkit.SoundCategory;
+import org.bukkit.entity.Player;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -34,7 +28,7 @@ public class MidiUtil
         return MidiUtil.instruments[patch];
     }
     
-    public static SoundType patchToInstrument(final int patch) {
+    public static Sound patchToInstrument(final int patch) {
         return Instrument.fromByte(byteInstrument(patch)).getSound();
     }
     
@@ -51,22 +45,22 @@ public class MidiUtil
         }
     }
     
-    public static SoundType soundAttempt(final String attempt, final String fallback) {
-        SoundType sound = null;
+    public static Sound soundAttempt(final String attempt, final String fallback) {
+        Sound sound = null;
         try {
-            sound = (SoundType)SoundTypes.class.getField(attempt).get(null);
+            sound = Sound.valueOf(attempt);
             if (sound==null) {
 				throw new NoSuchElementException();
 			}
         }
         catch (Exception e) {
             try {
-                sound = (SoundType)SoundTypes.class.getField(fallback).get(null);
+                sound = Sound.valueOf(fallback);
             }
             catch (Exception ex) {}
         }
         /*if (sound == null) {
-            sound = SoundTypes.ENTITY_PLAYER_LEVELUP;
+            sound = Sound.ENTITY_PLAYER_LEVELUP;
         }*/
         return sound;
     }
@@ -125,7 +119,7 @@ public class MidiUtil
         IRON_XYLOPHONE("IRON_XYLOPHONE", 15, 15, "BLOCK_NOTE_BLOCK_IRON_XYLOPHONE", "BLOCK_NOTE_BLOCK_XYLOPHONE", "BLOCK_NOTE_XYLOPHONE");
         
         private final int pitch;
-        private SoundType sound;
+        private Sound sound;
         
         private Instrument(final String s, final int n, final int pitch, final String sound, final String fallback, final String old) {
             this.sound = MidiUtil.soundAttempt(sound, fallback);
@@ -133,7 +127,7 @@ public class MidiUtil
                 this.sound = MidiUtil.soundAttempt(old, fallback);
             }
             if (sound == null) {
-            	this.sound = SoundTypes.ENTITY_PLAYER_LEVELUP;
+            	this.sound = Sound.ENTITY_PLAYER_LEVELUP;
             }
             this.pitch = pitch;
         }
@@ -191,7 +185,7 @@ public class MidiUtil
             }
         }
         
-        public SoundType getSound() {
+        public Sound getSound() {
             return this.sound;
         }
         
@@ -202,24 +196,28 @@ public class MidiUtil
     
     public interface PlaySoundAble
     {
-        void playSound(final SoundType p0, final float p1, final float p2);
+        void playSound(final Sound p0, final float p1, final float p2);
         
-        static PlaySoundAble newPlaySoundAble(final User player) {
+        static PlaySoundAble newPlaySoundAble(final OfflinePlayer player) {
             return new PlaySoundAble() {
                 @Override
-                public void playSound(final SoundType var1, final float var2, final float var3) {
+                public void playSound(final Sound var1, final float var2, final float var3) {
                     if (player.isOnline()) {
-                        player.getPlayer().ifPresent(i->i.playSound(var1,SoundCategories.MASTER,player.getPosition(), var2, var3));
+                    	Player p=player.getPlayer();
+                    	if(p!=null)
+                    	{
+                    		p.playSound(p.getLocation(),var1,SoundCategory.MASTER, var2, var3);
+                    	}
                     }
                 }
             };
         }
         
-        static PlaySoundAble newPlaySoundAble(final Location<World> loc) {
+        static PlaySoundAble newPlaySoundAble(final Location loc) {
             return new PlaySoundAble() {
                 @Override
-                public void playSound(final SoundType var1, final float var2, final float var3) {
-                    loc.getExtent().playSound(var1,SoundCategories.MASTER,loc.getPosition(), var2, var3);
+                public void playSound(final Sound var1, final float var2, final float var3) {
+                    loc.getWorld().playSound(loc,var1,SoundCategory.MASTER, var2, var3);
                 }
             };
         }
@@ -251,7 +249,7 @@ public class MidiUtil
                     case 144: {
                         final float volume = 10.0f * (message.getData2() / 127.0f);
                         final float pitch = this.getNote(this.toMCNote(message.getData1()));
-                        SoundType instrument = Instrument.PIANO.getSound();
+                        Sound instrument = Instrument.PIANO.getSound();
                         final Optional<Integer> optional = Optional.ofNullable(this.patches.get(message.getChannel()));
                         if (optional.isPresent()) {
                             instrument = ((channel == 9) ? MidiUtil.patchToInstrument(optional.get()) : MidiUtil.patchToInstrument(optional.get()));
